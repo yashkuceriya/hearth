@@ -21,7 +21,12 @@
 - [x] Agent client interface + local Python client
 - [x] gRPC server with health checks, graceful shutdown
 
-### Python Brain + Lawyer (93 tests)
+### Shared Claude LLM Client (7 tests)
+- [x] `python/src/hearth_llm/` — prompt caching, structured output parsing, JSON extraction
+- [x] Graceful fallback when `ANTHROPIC_API_KEY` unset (`LLMClient.available` returns False)
+- [x] Token + cache-hit telemetry via structured log lines
+
+### Python Brain + Lawyer + Voice + Closer (100 tests)
 - [x] Multi-agent framework (BaseAgent, Tool, DelegationRequest, AgentResponse)
 - [x] Brain agent (valuation, data rights, visual analysis tools)
 - [x] Voice agent (intent detection, lead scoring, product-path routing, delegation)
@@ -58,14 +63,15 @@
 ## What's Left to Build 🔲
 
 ### P0 (Deploy Blockers)
-- [ ] Push to GitHub + deploy to Railway/Render
-- [ ] CI pipeline (GitHub Actions: lint + test matrix over Go/Python/Ruby)
-- [ ] Database migration runner integration
-- [ ] TLS on gRPC endpoints
-- [ ] Secrets management (not .env files)
+- [x] Push to GitHub (repo live at yashkuceriya/hearth)
+- [x] CI pipeline (GitHub Actions matrix over Go/Python/Ruby) — issue #2
+- [ ] Deploy to Railway/Render — issue #5
+- [ ] Database migration runner integration — issue #1
+- [ ] TLS on gRPC endpoints — issue #3
+- [ ] Secrets management (not .env files) — issue #4
 
 ### P1 (Real product, not a demo)
-- [ ] Real Claude API integration (Claude Opus 4.7 in agent `think()` methods, prompt-cached)
+- [x] Real Claude API integration (shared client + Brain/Voice/Closer composition with deterministic fallback) — issues #6, #7, #8
 - [ ] Multi-turn session memory (address/intent within session)
 - [ ] API authentication (bearer tokens, per-tenant) + rate limiting
 - [ ] Email channel adapter (SendGrid)
@@ -98,6 +104,6 @@
 | Language | Tests | Status |
 |----------|-------|--------|
 | Go | 12 | ✅ All pass |
-| Python | 93 | ✅ All pass |
+| Python | 100 | ✅ All pass |
 | Ruby | 44 | ✅ All pass |
-| **Total** | **149** | **✅ All pass** |
+| **Total** | **156** | **✅ All pass** |
