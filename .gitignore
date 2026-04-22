@@ -1,0 +1,51 @@
+# Environment
+.env
+.env.local
+
+# Claude Code (local user settings)
+.claude/settings.local.json
+
+# Python egg-info (stale)
+python/src/*.egg-info/
+
+# Go
+go/gen/
+go/bin/
+go/tmp/
+
+# Python
+python/gen/
+python/__pycache__/
+python/**/__pycache__/
+python/.venv/
+python/*.egg-info/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Ruby
+ruby/lib/gen/
+ruby/.bundle/
+ruby/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+deploy/pgdata/
+
+# Build artifacts
+*.pb.go
+*_pb2.py
+*_pb2_grpc.py
+*_pb.rb
+*_services_pb.rb

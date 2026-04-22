@@ -1,0 +1,44 @@
+syntax = "proto3";
+package hearth.common.v1;
+
+option go_package = "github.com/yashkuceriya/hearth/gen/hearth/common/v1;commonv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Money {
+  int64 amount_cents = 1;
+  string currency = 2; // ISO 4217, always "USD" for now
+}
+
+message Address {
+  string street_line_1 = 1;
+  string street_line_2 = 2;
+  string city = 3;
+  string state = 4;
+  string zip_code = 5;
+  string county = 6;
+  double latitude = 7;
+  double longitude = 8;
+}
+
+message PropertyId {
+  string hearth_id = 1;
+  string mls_id = 2;
+  string tcad_id = 3;
+}
+
+enum ProductPath {
+  PRODUCT_PATH_UNSPECIFIED = 0;
+  PRODUCT_PATH_INSTANT_OFFER = 1;
+  PRODUCT_PATH_LISTING_BOOST = 2;
+  PRODUCT_PATH_AGENT_REFERRAL = 3;
+}
+
+message DataProvenance {
+  string source_system = 1;
+  string source_id = 2;
+  google.protobuf.Timestamp retrieved_at = 3;
+  google.protobuf.Timestamp source_updated_at = 4;
+  string license_id = 5;
+  int32 freshness_ttl_seconds = 6;
+}

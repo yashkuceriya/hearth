@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hearth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  orchestrator:
+    build:
+      context: ../go
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+      - "8080:8080"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth_dev
+      ORCHESTRATOR_DB: hearth_orchestrator
+      REDIS_URL: redis://redis:6379
+      ORCHESTRATOR_GRPC_PORT: "50051"
+      BRAIN_GRPC_HOST: brain
+      BRAIN_GRPC_PORT: "50053"
+      LAWYER_GRPC_HOST: lawyer
+      LAWYER_GRPC_PORT: "50054"
+      CLOSER_GRPC_HOST: closer
+      CLOSER_GRPC_PORT: "50055"
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  brain:
+    build:
+      context: ../python
+      dockerfile: Dockerfile
+    ports:
+      - "50053:50053"
+      - "8082:8082"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth_dev
+      BRAIN_DB: hearth_brain
+      SERVICE_NAME: brain
+      GRPC_PORT: "50053"
+      HTTP_PORT: "8082"
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  lawyer:
+    build:
+      context: ../python
+      dockerfile: Dockerfile
+    ports:
+      - "50054:50054"
+      - "8083:8083"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth_dev
+      LAWYER_DB: hearth_lawyer
+      SERVICE_NAME: lawyer
+      GRPC_PORT: "50054"
+      HTTP_PORT: "8083"
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  closer:
+    build:
+      context: ../ruby
+      dockerfile: Dockerfile
+    ports:
+      - "50055:50055"
+      - "8084:8084"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: hearth
+      POSTGRES_PASSWORD: hearth_dev
+      CLOSER_DB: hearth_closer
+      GRPC_PORT: "50055"
+      HTTP_PORT: "8084"
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

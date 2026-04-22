@@ -1,0 +1,87 @@
+syntax = "proto3";
+package hearth.brain.v1;
+
+option go_package = "github.com/yashkuceriya/hearth/gen/hearth/brain/v1;brainv1";
+
+import "hearth/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service ValuationService {
+  rpc GetValuation(ValuationRequest) returns (ValuationResponse);
+  rpc GetComparables(ComparablesRequest) returns (ComparablesResponse);
+  rpc CheckDataRights(DataRightsRequest) returns (DataRightsResponse);
+}
+
+message ValuationRequest {
+  hearth.common.v1.PropertyId property_id = 1;
+  ValuationContext context = 2;
+  bool include_visual_analysis = 3;
+  repeated string photo_urls = 4;
+}
+
+message ValuationContext {
+  hearth.common.v1.ProductPath product_path = 1;
+  string requesting_market = 2;
+  string use_case = 3;
+}
+
+message ValuationResponse {
+  hearth.common.v1.Money estimated_value = 1;
+  hearth.common.v1.Money confidence_low = 2;
+  hearth.common.v1.Money confidence_high = 3;
+  double confidence_score = 4;
+  ConditionCertaintyScore condition_score = 5;
+  repeated ComparableProperty comparables = 6;
+  repeated hearth.common.v1.DataProvenance sources = 7;
+  google.protobuf.Timestamp valid_until = 8;
+}
+
+message ConditionCertaintyScore {
+  double overall = 1;
+  map<string, double> component_scores = 2;
+  repeated string uncertainty_flags = 3;
+  bool visual_analysis_included = 4;
+  repeated RepairEstimate repairs = 5;
+}
+
+message RepairEstimate {
+  string category = 1;
+  string description = 2;
+  hearth.common.v1.Money estimated_cost_low = 3;
+  hearth.common.v1.Money estimated_cost_high = 4;
+  double urgency = 5;
+}
+
+message ComparableProperty {
+  hearth.common.v1.PropertyId property_id = 1;
+  hearth.common.v1.Address address = 2;
+  hearth.common.v1.Money sold_price = 3;
+  google.protobuf.Timestamp sold_date = 4;
+  double similarity_score = 5;
+  hearth.common.v1.DataProvenance provenance = 6;
+}
+
+message DataRightsRequest {
+  string data_source = 1;
+  string market = 2;
+  string use_case = 3;
+  string license_id = 4;
+}
+
+message DataRightsResponse {
+  bool allowed = 1;
+  string denial_reason = 2;
+  repeated string restrictions = 3;
+}
+
+message ComparablesRequest {
+  hearth.common.v1.PropertyId subject_property = 1;
+  int32 max_results = 2;
+  double max_distance_miles = 3;
+  int32 max_age_days = 4;
+}
+
+message ComparablesResponse {
+  repeated ComparableProperty comparables = 1;
+  repeated hearth.common.v1.DataProvenance sources = 2;
+}

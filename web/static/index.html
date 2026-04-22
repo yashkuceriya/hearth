@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hearth AI Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: oklch(0.55 0.14 175);
+            --brand-light: oklch(0.94 0.04 175);
+            --brand-dark: oklch(0.40 0.10 175);
+            --accent: oklch(0.65 0.15 45);
+            --surface: oklch(0.985 0.005 80);
+            --surface-raised: oklch(1.0 0.0 0);
+            --surface-sunken: oklch(0.965 0.008 80);
+            --text-primary: oklch(0.18 0.01 80);
+            --text-secondary: oklch(0.45 0.01 80);
+            --text-tertiary: oklch(0.62 0.008 80);
+            --border: oklch(0.90 0.008 80);
+            --border-subtle: oklch(0.94 0.006 80);
+            --danger: oklch(0.55 0.18 25);
+            --danger-bg: oklch(0.95 0.03 25);
+            --warning: oklch(0.60 0.15 80);
+            --warning-bg: oklch(0.95 0.03 80);
+            --success: oklch(0.55 0.12 155);
+            --success-bg: oklch(0.95 0.03 155);
+            --chat-width: 720px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--surface);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--surface-raised);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo {
+            width: 34px; height: 34px;
+            background: var(--brand);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'DM Serif Display', serif;
+            font-size: 19px;
+            color: var(--surface-raised);
+            letter-spacing: -0.5px;
+        }
+
+        .header-text h1 {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+        }
+
+        .header-text .subtitle {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-weight: 400;
+        }
+
+        .header-right {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        /* --- Agent Status Bar --- */
+        .agent-bar {
+            background: var(--surface-raised);
+            border-bottom: 1px solid var(--border);
+            padding: 6px 32px;
+            display: flex;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .agent-pill {
+            padding: 3px 10px;
+            border-radius: 4px;
+            background: transparent;
+            color: var(--text-tertiary);
+            transition: color 0.25s ease-out, background 0.25s ease-out;
+        }
+
+        .agent-pill.active {
+            color: var(--brand-dark);
+            background: var(--brand-light);
+        }
+
+        /* --- Chat Area --- */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chat-scroll {
+            max-width: var(--chat-width);
+            margin: 0 auto;
+            padding: 32px 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- Messages --- */
+        .message {
+            display: flex;
+            gap: 10px;
+            animation: msgIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message.user .bubble {
+            max-width: 75%;
+        }
+
+        .bubble-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .avatar {
+            width: 30px; height: 30px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .message.agent .avatar {
+            background: var(--brand);
+            color: var(--surface-raised);
+        }
+
+        .message.user .avatar {
+            background: var(--surface-sunken);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .bubble {
+            padding: 12px 16px;
+            line-height: 1.6;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .message.agent .bubble {
+            background: var(--surface-raised);
+            border: 1px solid var(--border);
+            border-radius: 2px 14px 14px 14px;
+        }
+
+        .message.user .bubble {
+            background: var(--brand);
+            color: var(--surface-raised);
+            border-radius: 14px 2px 14px 14px;
+        }
+
+        /* --- Meta Tags --- */
+        .meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            white-space: normal;
+            font-weight: 500;
+        }
+
+        .meta .tag {
+            padding: 2px 7px;
+            border-radius: 3px;
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-subtle);
+            letter-spacing: 0.2px;
+        }
+
+        .meta .blocked {
+            color: var(--danger);
+            background: var(--danger-bg);
+            border-color: oklch(0.88 0.04 25);
+        }
+
+        .meta .human {
+            color: var(--warning);
+            background: var(--warning-bg);
+            border-color: oklch(0.88 0.04 80);
+        }
+
+        .meta .delegation {
+            color: var(--brand-dark);
+            background: var(--brand-light);
+            border-color: oklch(0.88 0.04 175);
+        }
+
+        /* --- Input Area --- */
+        .input-area {
+            border-top: 1px solid var(--border);
+            background: var(--surface-raised);
+        }
+
+        .input-wrap {
+            max-width: var(--chat-width);
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrap input {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 11px 16px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+        }
+
+        .input-wrap input:focus {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px oklch(0.55 0.14 175 / 0.1);
+        }
+
+        .input-wrap input::placeholder { color: var(--text-tertiary); }
+
+        .input-wrap button {
+            background: var(--brand);
+            border: none;
+            border-radius: 10px;
+            padding: 11px 22px;
+            color: var(--surface-raised);
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.15s ease-out;
+            letter-spacing: -0.2px;
+        }
+
+        .input-wrap button:hover { background: var(--brand-dark); }
+        .input-wrap button:active { transform: scale(0.98); }
+        .input-wrap button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* --- Typing Indicator --- */
+        .typing {
+            display: none;
+            padding: 6px 0;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            gap: 8px;
+            align-items: center;
+        }
+
+        .typing.show { display: flex; }
+
+        .typing-dots span {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--brand);
+            display: inline-block;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes pulse {
+            0%, 80%, 100% { opacity: 0.2; transform: scale(0.85); }
+            40% { opacity: 1; transform: scale(1); }
+        }
+
+        /* --- Welcome Screen --- */
+        .welcome {
+            padding: 48px 0 32px;
+        }
+
+        .welcome h2 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 28px;
+            font-weight: 400;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .welcome p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 15px;
+            margin-bottom: 28px;
+        }
+
+        .prompts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .prompts button {
+            background: var(--surface-raised);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.2s ease-out, color 0.2s ease-out;
+            text-align: left;
+        }
+
+        .prompts button:hover {
+            border-color: var(--brand);
+            color: var(--brand-dark);
+        }
+
+        /* --- New Session Button --- */
+        .new-session {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            transition: color 0.2s ease-out, border-color 0.2s ease-out;
+        }
+
+        .new-session:hover {
+            color: var(--text-secondary);
+            border-color: var(--text-tertiary);
+        }
+
+        /* --- Debug Panel (collapsible under each message) --- */
+        .debug-toggle {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            user-select: none;
+        }
+
+        .debug-toggle:hover { color: var(--text-secondary); }
+
+        .debug-toggle .arrow {
+            display: inline-block;
+            transition: transform 0.2s ease-out;
+            font-size: 9px;
+        }
+
+        .debug-toggle.open .arrow { transform: rotate(90deg); }
+
+        .debug-panel {
+            display: none;
+            margin-top: 8px;
+            padding: 10px 12px;
+            background: var(--surface-sunken);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        .debug-panel.open { display: block; }
+
+        .debug-panel h4 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-tertiary);
+            margin: 8px 0 4px;
+        }
+
+        .debug-panel h4:first-child { margin-top: 0; }
+
+        .debug-panel .reasoning {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+            color: var(--text-tertiary);
+            padding: 4px 0;
+        }
+
+        .debug-panel .memory-item {
+            display: flex;
+            gap: 8px;
+            padding: 2px 0;
+        }
+
+        .debug-panel .memory-key {
+            font-weight: 600;
+            color: var(--brand-dark);
+            min-width: 120px;
+        }
+
+        /* --- Session bar --- */
+        .session-bar {
+            background: var(--surface-sunken);
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            display: none;
+        }
+
+        .session-bar.active { display: block; }
+
+        .session-bar-inner {
+            max-width: var(--chat-width);
+            margin: 0 auto;
+            padding: 4px 24px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 640px) {
+            header { padding: 12px 16px; }
+            .agent-bar { padding: 6px 16px; gap: 6px; }
+            .chat-scroll { padding: 20px 16px 12px; }
+            .input-wrap { padding: 12px 16px; }
+            .welcome h2 { font-size: 24px; }
+            .welcome p { font-size: 14px; }
+            .prompts button { font-size: 12px; padding: 7px 11px; }
+        }
+
+        /* --- Reduced motion --- */
+        @media (prefers-reduced-motion: reduce) {
+            .message { animation: none; }
+            .typing-dots span { animation: none; opacity: 0.5; }
+            * { transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">O</div>
+        <div class="header-text">
+            <h1>Hearth AI Agent</h1>
+            <div class="subtitle">Austin, TX real estate</div>
+        </div>
+        <div class="header-right">
+            <button class="new-session" onclick="newSession()">New session</button>
+        </div>
+    </header>
+
+    <div class="agent-bar">
+        <div class="agent-pill" id="pill-voice">Voice</div>
+        <div class="agent-pill" id="pill-brain">Brain</div>
+        <div class="agent-pill" id="pill-closer">Closer</div>
+        <div class="agent-pill" id="pill-lawyer">Lawyer</div>
+    </div>
+
+    <div class="session-bar" id="session-bar">
+        <div class="session-bar-inner">
+            <span id="session-info">Session: —</span>
+            <span id="memory-info">Memory: empty</span>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-scroll" id="chat">
+            <div class="welcome" id="welcome">
+            <h2>How can I help with your home search?</h2>
+            <p>I'm a multi-agent system built for Austin real estate. Ask about valuations, make offers, explore neighborhoods, or learn about Hearth's programs.</p>
+            <div class="prompts">
+                <button onclick="sendPrompt('What is my home at 1234 Elm St worth?')">Get a home valuation</button>
+                <button onclick="sendPrompt('I want to make a cash offer on a property')">Make an offer</button>
+                <button onclick="sendPrompt('Tell me about neighborhoods in South Austin')">Explore neighborhoods</button>
+                <button onclick="sendPrompt('I want to schedule a tour')">Schedule a tour</button>
+                <button onclick="sendPrompt('How does the Listing Boost program work?')">Learn about Listing Boost</button>
+            </div>
+        </div>
+    </div></div>
+
+    <div class="input-area">
+        <div class="input-wrap">
+            <input type="text" id="input" placeholder="Ask about Austin real estate..." autocomplete="off"
+                   onkeydown="if(event.key==='Enter'&& !event.shiftKey) send()" aria-label="Message input">
+            <button id="sendBtn" onclick="send()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+
+        function scrollToBottom() {
+            var container = document.querySelector('.chat-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function newSession() {
+            sessionId = null;
+            const chat = document.getElementById('chat');
+            chat.innerHTML = '';
+            const welcome = document.createElement('div');
+            welcome.className = 'welcome';
+            welcome.id = 'welcome';
+            welcome.innerHTML = `
+                <h2>How can I help with your home search?</h2>
+                <p>I'm a multi-agent system built for Austin real estate. Ask about valuations, make offers, explore neighborhoods, or learn about Hearth's programs.</p>
+                <div class="prompts">
+                    <button onclick="sendPrompt('What is my home at 1234 Elm St worth?')">Get a home valuation</button>
+                    <button onclick="sendPrompt('I want to make a cash offer on a property')">Make an offer</button>
+                    <button onclick="sendPrompt('Tell me about neighborhoods in South Austin')">Explore neighborhoods</button>
+                    <button onclick="sendPrompt('I want to schedule a tour')">Schedule a tour</button>
+                    <button onclick="sendPrompt('How does the Listing Boost program work?')">Learn about Listing Boost</button>
+                </div>`;
+            chat.appendChild(welcome);
+            document.querySelectorAll('.agent-pill').forEach(function(p) { p.classList.remove('active'); });
+            document.getElementById('session-bar').classList.remove('active');
+        }
+
+        function sendPrompt(text) {
+            document.getElementById('input').value = text;
+            send();
+        }
+
+        function cleanAgentName(raw) {
+            var name = raw.replace(/-[a-f0-9]+$/, '');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        }
+
+        async function send() {
+            var input = document.getElementById('input');
+            var msg = input.value.trim();
+            if (!msg) return;
+
+            var welcome = document.getElementById('welcome');
+            if (welcome) welcome.remove();
+
+            addMessage(msg, 'user');
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+
+            var chat = document.getElementById('chat');
+            var typingEl = document.createElement('div');
+            typingEl.className = 'typing show';
+            typingEl.id = 'typing-active';
+            typingEl.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div><span>Processing...</span>';
+            chat.appendChild(typingEl);
+            scrollToBottom();
+
+            document.querySelectorAll('.agent-pill').forEach(function(p) { p.classList.remove('active'); });
+
+            try {
+                var res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, session_id: sessionId }),
+                });
+
+                if (!res.ok) {
+                    var err = await res.json();
+                    throw new Error(err.detail || 'Server error');
+                }
+
+                var data = await res.json();
+                sessionId = data.session_id;
+
+                (data.agents_involved || []).forEach(function(a) {
+                    var pill = document.getElementById('pill-' + a);
+                    if (pill) pill.classList.add('active');
+                });
+
+                var activeTyping = document.getElementById('typing-active');
+                if (activeTyping) activeTyping.remove();
+
+                // Update session bar
+                var sbar = document.getElementById('session-bar');
+                sbar.classList.add('active');
+                document.getElementById('session-info').textContent = 'Turn ' + data.turn_number + ' \u00b7 ' + data.session_id.substring(0, 8);
+                var memKeys = Object.keys(data.session_memory || {});
+                document.getElementById('memory-info').textContent = memKeys.length ? 'Memory: ' + memKeys.join(', ') : 'Memory: empty';
+
+                addMessage(data.response, 'agent', {
+                    agents: data.agents_involved,
+                    delegations: data.delegations,
+                    confidence: data.confidence,
+                    blocked: data.blocked,
+                    needs_human: data.needs_human,
+                    agent_details: data.agent_details,
+                    session_memory: data.session_memory,
+                    turn_number: data.turn_number,
+                });
+            } catch (e) {
+                var activeTyping2 = document.getElementById('typing-active');
+                if (activeTyping2) activeTyping2.remove();
+                addMessage('Something went wrong: ' + e.message, 'agent');
+            }
+
+            input.disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            input.focus();
+        }
+
+        function addMessage(text, type, meta) {
+            var chat = document.getElementById('chat');
+            var div = document.createElement('div');
+            div.className = 'message ' + type;
+
+            var avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = type === 'user' ? 'Y' : 'O';
+
+            var bubble = document.createElement('div');
+            bubble.className = 'bubble';
+
+            var textNode = document.createElement('span');
+            textNode.textContent = text;
+            bubble.appendChild(textNode);
+
+            if (meta) {
+                var metaDiv = document.createElement('div');
+                metaDiv.className = 'meta';
+
+                if (meta.agents && meta.agents.length) {
+                    meta.agents.forEach(function(a) {
+                        var span = document.createElement('span');
+                        span.className = 'tag';
+                        span.textContent = a;
+                        metaDiv.appendChild(span);
+                    });
+                }
+
+                if (meta.confidence !== undefined && meta.confidence !== null) {
+                    var span = document.createElement('span');
+                    span.className = 'tag';
+                    span.textContent = (meta.confidence * 100).toFixed(0) + '% confidence';
+                    metaDiv.appendChild(span);
+                }
+
+                if (meta.delegations && meta.delegations.length) {
+                    meta.delegations.forEach(function(d) {
+                        var span = document.createElement('span');
+                        span.className = 'tag delegation';
+                        span.textContent = cleanAgentName(d.from) + ' \u2192 ' + cleanAgentName(d.to);
+                        metaDiv.appendChild(span);
+                    });
+                }
+
+                if (meta.blocked) {
+                    var bspan = document.createElement('span');
+                    bspan.className = 'tag blocked';
+                    bspan.textContent = 'Blocked by compliance';
+                    metaDiv.appendChild(bspan);
+                }
+
+                if (meta.needs_human) {
+                    var hspan = document.createElement('span');
+                    hspan.className = 'tag human';
+                    hspan.textContent = 'Human review needed';
+                    metaDiv.appendChild(hspan);
+                }
+
+                bubble.appendChild(metaDiv);
+
+                // Debug toggle + panel
+                if (meta.agent_details && meta.agent_details.length) {
+                    var toggleId = 'debug-' + Date.now();
+
+                    var toggle = document.createElement('div');
+                    toggle.className = 'debug-toggle';
+                    toggle.innerHTML = '<span class="arrow">\u25B6</span> Pipeline details';
+                    toggle.onclick = function() {
+                        toggle.classList.toggle('open');
+                        document.getElementById(toggleId).classList.toggle('open');
+                    };
+                    bubble.appendChild(toggle);
+
+                    var panel = document.createElement('div');
+                    panel.className = 'debug-panel';
+                    panel.id = toggleId;
+
+                    // Agent reasoning
+                    panel.innerHTML += '<h4>Agent Pipeline</h4>';
+                    meta.agent_details.forEach(function(ad) {
+                        var name = ad.agent.charAt(0).toUpperCase() + ad.agent.slice(1);
+                        panel.innerHTML += '<div style="margin-bottom:6px"><strong>' + name + '</strong> (confidence: ' + (ad.confidence * 100).toFixed(0) + '%)<div class="reasoning">' + escapeHtml(ad.reasoning) + '</div></div>';
+                    });
+
+                    // Session memory
+                    if (meta.session_memory && Object.keys(meta.session_memory).length) {
+                        panel.innerHTML += '<h4>Session Memory</h4>';
+                        Object.keys(meta.session_memory).forEach(function(k) {
+                            panel.innerHTML += '<div class="memory-item"><span class="memory-key">' + k + '</span><span>' + escapeHtml(String(meta.session_memory[k])) + '</span></div>';
+                        });
+                    }
+
+                    bubble.appendChild(panel);
+                }
+            }
+
+            div.appendChild(avatar);
+            if (type === 'agent') {
+                var wrap = document.createElement('div');
+                wrap.className = 'bubble-wrap';
+                wrap.appendChild(bubble);
+                div.appendChild(wrap);
+            } else {
+                div.appendChild(bubble);
+            }
+            chat.appendChild(div);
+            scrollToBottom();
+        }
+
+        function escapeHtml(str) {
+            var d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+    </script>
+</body>
+</html>

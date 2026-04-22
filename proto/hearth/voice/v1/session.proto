@@ -1,0 +1,120 @@
+syntax = "proto3";
+package hearth.voice.v1;
+
+option go_package = "github.com/yashkuceriya/hearth/gen/hearth/voice/v1;voicev1";
+
+import "hearth/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service SessionService {
+  rpc CreateSession(CreateSessionRequest) returns (Session);
+  rpc GetSession(GetSessionRequest) returns (Session);
+  rpc UpdateSession(UpdateSessionRequest) returns (Session);
+  rpc StreamInteraction(stream InteractionMessage) returns (stream InteractionMessage);
+}
+
+service LeadService {
+  rpc QualifyLead(QualifyLeadRequest) returns (QualificationResult);
+  rpc RouteToProduct(RoutingRequest) returns (RoutingDecision);
+  rpc CheckTourEligibility(TourEligibilityRequest) returns (TourEligibilityResponse);
+}
+
+enum ChannelType {
+  CHANNEL_TYPE_UNSPECIFIED = 0;
+  CHANNEL_TYPE_VOICE = 1;
+  CHANNEL_TYPE_SMS = 2;
+  CHANNEL_TYPE_EMAIL = 3;
+  CHANNEL_TYPE_WEB_CHAT = 4;
+}
+
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_GREETING = 1;
+  SESSION_STATE_QUALIFYING = 2;
+  SESSION_STATE_PROPERTY_DISCUSSION = 3;
+  SESSION_STATE_SCHEDULING = 4;
+  SESSION_STATE_OFFER_DISCUSSION = 5;
+  SESSION_STATE_HANDOFF_TO_HUMAN = 6;
+  SESSION_STATE_CLOSED = 7;
+}
+
+message Session {
+  string id = 1;
+  string lead_id = 2;
+  ChannelType channel = 3;
+  SessionState state = 4;
+  map<string, string> context = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_activity = 7;
+  string assigned_agent_id = 8;
+}
+
+message CreateSessionRequest {
+  string lead_id = 1;
+  ChannelType channel = 2;
+  map<string, string> initial_context = 3;
+}
+
+message GetSessionRequest {
+  string id = 1;
+}
+
+message UpdateSessionRequest {
+  string id = 1;
+  SessionState state = 2;
+  map<string, string> context_updates = 3;
+}
+
+message InteractionMessage {
+  string session_id = 1;
+  string content = 2;
+  string sender = 3;
+  ChannelType channel = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  map<string, string> metadata = 6;
+}
+
+message QualifyLeadRequest {
+  string lead_id = 1;
+  repeated IntentSignal signals = 2;
+}
+
+message IntentSignal {
+  string signal_type = 1;
+  string value = 2;
+  double strength = 3;
+}
+
+message QualificationResult {
+  string lead_id = 1;
+  double score = 2;
+  string tier = 3;
+  hearth.common.v1.ProductPath recommended_path = 4;
+  repeated string qualifying_factors = 5;
+  repeated string disqualifying_factors = 6;
+}
+
+message TourEligibilityRequest {
+  string lead_id = 1;
+  hearth.common.v1.PropertyId property_id = 2;
+}
+
+message TourEligibilityResponse {
+  bool eligible = 1;
+  bool buyer_agreement_on_file = 2;
+  string denial_reason = 3;
+  string required_action = 4;
+}
+
+message RoutingRequest {
+  string lead_id = 1;
+  QualificationResult qualification = 2;
+  hearth.common.v1.PropertyId property_id = 3;
+}
+
+message RoutingDecision {
+  hearth.common.v1.ProductPath path = 1;
+  double expected_value = 2;
+  string rationale = 3;
+  bool requires_human_handoff = 4;
+}

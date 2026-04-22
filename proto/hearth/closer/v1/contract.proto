@@ -1,0 +1,220 @@
+syntax = "proto3";
+package hearth.closer.v1;
+
+option go_package = "github.com/yashkuceriya/hearth/gen/hearth/closer/v1;closerv1";
+
+import "hearth/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service ContractService {
+  rpc PopulateForm(PopulateFormRequest) returns (PopulateFormResponse);
+  rpc ValidateForm(ValidateFormRequest) returns (ValidateFormResponse);
+  rpc GetFormVersions(GetFormVersionsRequest) returns (GetFormVersionsResponse);
+}
+
+service TransactionService {
+  rpc CreateTransaction(CreateTransactionRequest) returns (Transaction);
+  rpc GetTransaction(GetTransactionRequest) returns (Transaction);
+  rpc AdvanceMilestone(AdvanceMilestoneRequest) returns (Transaction);
+  rpc GetTransactionHistory(GetTransactionHistoryRequest) returns (TransactionHistoryResponse);
+}
+
+service NegotiationService {
+  rpc SubmitOffer(SubmitOfferRequest) returns (NegotiationRound);
+  rpc Counteroffer(CounterofferRequest) returns (NegotiationRound);
+  rpc CheckGuardrails(GuardrailCheckRequest) returns (GuardrailCheckResponse);
+  rpc CalculateConcession(ConcessionRequest) returns (ConcessionResponse);
+}
+
+// TREC Form Types
+enum TRECFormType {
+  TREC_FORM_UNSPECIFIED = 0;
+  TREC_FORM_ONE_TO_FOUR_FAMILY = 1;
+  TREC_FORM_THIRD_PARTY_FINANCING = 2;
+  TREC_FORM_SELLER_FINANCING = 3;
+  TREC_FORM_PROPERTY_CONDITION = 4;
+  TREC_FORM_AMENDMENT = 5;
+}
+
+message PopulateFormRequest {
+  TRECFormType form_type = 1;
+  string form_version = 2;
+  string transaction_id = 3;
+  map<string, string> field_values = 4;
+}
+
+message PopulateFormResponse {
+  bytes pdf_content = 1;
+  repeated FieldValidationError errors = 2;
+  repeated string warnings = 3;
+  bool is_complete = 4;
+  repeated string missing_required_fields = 5;
+}
+
+message ValidateFormRequest {
+  TRECFormType form_type = 1;
+  string form_version = 2;
+  map<string, string> field_values = 3;
+}
+
+message ValidateFormResponse {
+  bool valid = 1;
+  repeated FieldValidationError errors = 2;
+  repeated string warnings = 3;
+}
+
+message FieldValidationError {
+  string field_name = 1;
+  string error_message = 2;
+  string provided_value = 3;
+}
+
+message GetFormVersionsRequest {
+  TRECFormType form_type = 1;
+}
+
+message GetFormVersionsResponse {
+  repeated FormVersion versions = 1;
+}
+
+message FormVersion {
+  TRECFormType form_type = 1;
+  string version = 2;
+  string effective_date = 3;
+  bool is_current = 4;
+}
+
+// Transaction
+enum TransactionState {
+  TRANSACTION_STATE_UNSPECIFIED = 0;
+  TRANSACTION_STATE_OFFER_SUBMITTED = 1;
+  TRANSACTION_STATE_UNDER_NEGOTIATION = 2;
+  TRANSACTION_STATE_EXECUTED = 3;
+  TRANSACTION_STATE_OPTION_PERIOD = 4;
+  TRANSACTION_STATE_PENDING = 5;
+  TRANSACTION_STATE_CLOSING = 6;
+  TRANSACTION_STATE_CLOSED = 7;
+  TRANSACTION_STATE_TERMINATED = 8;
+}
+
+message Transaction {
+  string id = 1;
+  hearth.common.v1.PropertyId property_id = 2;
+  string buyer_lead_id = 3;
+  TransactionState state = 4;
+  hearth.common.v1.Money offer_price = 5;
+  repeated Milestone milestones = 6;
+  hearth.common.v1.ProductPath product_path = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreateTransactionRequest {
+  hearth.common.v1.PropertyId property_id = 1;
+  string buyer_lead_id = 2;
+  hearth.common.v1.Money offer_price = 3;
+  hearth.common.v1.ProductPath product_path = 4;
+}
+
+message GetTransactionRequest {
+  string id = 1;
+}
+
+message AdvanceMilestoneRequest {
+  string transaction_id = 1;
+  string milestone_name = 2;
+  string completed_by = 3;
+}
+
+message GetTransactionHistoryRequest {
+  string transaction_id = 1;
+}
+
+message TransactionHistoryResponse {
+  repeated TransactionEvent events = 1;
+}
+
+message TransactionEvent {
+  string id = 1;
+  string transaction_id = 2;
+  TransactionState from_state = 3;
+  TransactionState to_state = 4;
+  map<string, string> metadata = 5;
+  string triggered_by = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message Milestone {
+  string name = 1;
+  bool completed = 2;
+  google.protobuf.Timestamp due_date = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  string completed_by = 5;
+}
+
+// Negotiation
+message NegotiationRound {
+  string id = 1;
+  string transaction_id = 2;
+  int32 round_number = 3;
+  hearth.common.v1.Money proposed_price = 4;
+  repeated Concession concessions = 5;
+  string proposer = 6;
+  NegotiationOutcome outcome = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+enum NegotiationOutcome {
+  NEGOTIATION_OUTCOME_UNSPECIFIED = 0;
+  NEGOTIATION_OUTCOME_PENDING = 1;
+  NEGOTIATION_OUTCOME_ACCEPTED = 2;
+  NEGOTIATION_OUTCOME_COUNTERED = 3;
+  NEGOTIATION_OUTCOME_REJECTED = 4;
+  NEGOTIATION_OUTCOME_EXPIRED = 5;
+}
+
+message Concession {
+  string type = 1;
+  hearth.common.v1.Money amount = 2;
+  string description = 3;
+  bool post_nar_compliant = 4;
+}
+
+message SubmitOfferRequest {
+  string transaction_id = 1;
+  hearth.common.v1.Money proposed_price = 2;
+  repeated Concession concessions = 3;
+}
+
+message CounterofferRequest {
+  string transaction_id = 1;
+  string negotiation_round_id = 2;
+  hearth.common.v1.Money proposed_price = 3;
+  repeated Concession concessions = 4;
+}
+
+message GuardrailCheckRequest {
+  string transaction_id = 1;
+  hearth.common.v1.Money proposed_price = 2;
+  repeated Concession proposed_concessions = 3;
+}
+
+message GuardrailCheckResponse {
+  bool within_guardrails = 1;
+  repeated string violations = 2;
+  hearth.common.v1.Money floor_price = 3;
+  hearth.common.v1.Money ceiling_price = 4;
+  double expected_margin = 5;
+}
+
+message ConcessionRequest {
+  string transaction_id = 1;
+  string concession_type = 2;
+  hearth.common.v1.Money requested_amount = 3;
+}
+
+message ConcessionResponse {
+  bool approved = 1;
+  Concession concession = 2;
+  string denial_reason = 3;
+}

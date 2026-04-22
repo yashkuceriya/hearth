@@ -1,0 +1,172 @@
+syntax = "proto3";
+package hearth.lawyer.v1;
+
+option go_package = "github.com/yashkuceriya/hearth/gen/hearth/lawyer/v1;lawyerv1";
+
+import "hearth/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+service ComplianceService {
+  rpc CheckFairHousing(FairHousingRequest) returns (FairHousingResponse);
+  rpc CheckOutboundMessage(OutboundMessageRequest) returns (OutboundMessageResponse);
+}
+
+service ClaimsService {
+  rpc RecordClaim(RecordClaimRequest) returns (Claim);
+  rpc VerifyClaim(VerifyClaimRequest) returns (ClaimVerification);
+  rpc GetClaimsBySession(GetClaimsBySessionRequest) returns (ClaimsResponse);
+  rpc ReproduceAgentState(ReproduceRequest) returns (ReproduceResponse);
+  rpc CheckFreshness(FreshnessCheckRequest) returns (FreshnessCheckResponse);
+}
+
+service AuditService {
+  rpc RecordAuditEntry(RecordAuditEntryRequest) returns (AuditEntry);
+  rpc CheckHITLTrigger(HITLTriggerRequest) returns (HITLTriggerResponse);
+  rpc GetAuditTrail(GetAuditTrailRequest) returns (AuditTrailResponse);
+}
+
+// Fair Housing
+message FairHousingRequest {
+  string text_content = 1;
+  string channel = 2;
+  string session_id = 3;
+}
+
+message FairHousingResponse {
+  bool compliant = 1;
+  repeated FairHousingViolation violations = 2;
+  string sanitized_text = 3;
+}
+
+message FairHousingViolation {
+  string violation_type = 1;
+  string matched_text = 2;
+  string rule_id = 3;
+  string explanation = 4;
+}
+
+// Claims Ledger
+message Claim {
+  string id = 1;
+  string session_id = 2;
+  string statement = 3;
+  repeated ClaimSource sources = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp valid_until = 6;
+  ClaimStatus status = 7;
+}
+
+enum ClaimStatus {
+  CLAIM_STATUS_UNSPECIFIED = 0;
+  CLAIM_STATUS_VERIFIED = 1;
+  CLAIM_STATUS_STALE = 2;
+  CLAIM_STATUS_UNVERIFIABLE = 3;
+  CLAIM_STATUS_RETRACTED = 4;
+}
+
+message ClaimSource {
+  hearth.common.v1.DataProvenance provenance = 1;
+  string source_statement = 2;
+  double relevance_score = 3;
+}
+
+message RecordClaimRequest {
+  string session_id = 1;
+  string statement = 2;
+  repeated ClaimSource sources = 3;
+  int32 freshness_ttl_seconds = 4;
+}
+
+message VerifyClaimRequest {
+  string claim_id = 1;
+}
+
+message ClaimVerification {
+  string claim_id = 1;
+  bool verified = 2;
+  string reason = 3;
+}
+
+message GetClaimsBySessionRequest {
+  string session_id = 1;
+}
+
+message ClaimsResponse {
+  repeated Claim claims = 1;
+}
+
+message FreshnessCheckRequest {
+  repeated string claim_ids = 1;
+}
+
+message FreshnessCheckResponse {
+  map<string, bool> results = 1;
+  repeated string stale_claim_ids = 2;
+}
+
+message ReproduceRequest {
+  string session_id = 1;
+  google.protobuf.Timestamp as_of = 2;
+}
+
+message ReproduceResponse {
+  repeated Claim active_claims = 1;
+  map<string, string> data_snapshots = 2;
+}
+
+// Outbound Message Check
+message OutboundMessageRequest {
+  string session_id = 1;
+  string text_content = 2;
+  string channel = 3;
+  repeated string referenced_claim_ids = 4;
+}
+
+message OutboundMessageResponse {
+  bool approved = 1;
+  repeated string blocked_reasons = 2;
+  repeated Claim new_claims = 3;
+  repeated string stale_warnings = 4;
+}
+
+// HITL
+message HITLTriggerRequest {
+  string session_id = 1;
+  double sentiment_score = 2;
+  double agent_confidence = 3;
+  string trigger_context = 4;
+}
+
+message HITLTriggerResponse {
+  bool escalate = 1;
+  string escalation_reason = 2;
+  string priority = 3;
+  string suggested_human_action = 4;
+}
+
+// Audit
+message RecordAuditEntryRequest {
+  string session_id = 1;
+  string action = 2;
+  string actor = 3;
+  map<string, string> details = 4;
+}
+
+message AuditEntry {
+  string id = 1;
+  string session_id = 2;
+  string action = 3;
+  string actor = 4;
+  map<string, string> details = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+message GetAuditTrailRequest {
+  string session_id = 1;
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+}
+
+message AuditTrailResponse {
+  repeated AuditEntry entries = 1;
+}
