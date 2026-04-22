@@ -9,7 +9,7 @@ must be:
 3. Reproducible at any point in time
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from enum import Enum
 from typing import Optional

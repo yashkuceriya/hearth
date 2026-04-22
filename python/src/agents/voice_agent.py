@@ -4,7 +4,28 @@ Delegates to Brain for market data and to Closer for transaction actions.
 """
 
 from agents.base import BaseAgent, AgentRole, AgentResponse, DelegationRequest, Tool
-from typing import Any
+from hearth_llm import LLMClient, get_default_client
+from typing import Any, Optional
+import json
+import logging
+
+log = logging.getLogger(__name__)
+
+_VOICE_COMPOSE_SYSTEM = """You are the Voice agent in Hearth, an AI real estate system.
+You talk to customers directly. Your job: write a short, warm reply grounded in FACTS.
+
+HARD RULES — do not violate:
+1. Use ONLY information in FACTS. Never invent prices, addresses, or availability.
+2. Never use subjective neighborhood terms (good/bad/safe/dangerous/desirable).
+3. Never reference protected classes (race, religion, family status, etc).
+4. If a tour is requested and buyer_agreement_signed=false, explain the post-NAR
+   requirement for a buyer representation agreement BEFORE scheduling.
+5. Keep it under 100 words. Conversational, not robotic.
+6. If the customer asks about an Hearth program, stick to these names:
+   - Instant Offer: we buy the home directly, fast close.
+   - Listing Boost: we partner with a local agent, backed by our data.
+   - Agent Referral: warm referral to a vetted partner agent.
+"""
 
 
 class VoiceAgent(BaseAgent):
@@ -33,9 +54,10 @@ class VoiceAgent(BaseAgent):
         ],
     }
 
-    def __init__(self, agent_id=None):
+    def __init__(self, agent_id=None, llm: Optional[LLMClient] = None):
         self.lead_scores: dict[str, float] = {}
         self.session_intents: dict[str, list[str]] = {}
+        self.llm = llm if llm is not None else get_default_client()
         super().__init__(AgentRole.VOICE, agent_id)
 
     def _setup_tools(self):
@@ -106,9 +128,20 @@ class VoiceAgent(BaseAgent):
             ))
             reasoning_steps.append("Delegating transaction request to Closer agent")
 
-        # Step 4: Generate response
+        # Step 4: Generate response (LLM-composed with deterministic facts, rule-based fallback)
         tier = qualification["tier"]
-        response_content = self._generate_response(message, tier, needs_market_data, needs_transaction, needs_tour, context)
+        fallback = self._generate_response(message, tier, needs_market_data, needs_transaction, needs_tour, context)
+        facts = {
+            "lead_tier": tier,
+            "lead_score": round(qualification["score"], 2),
+            "needs_market_data": needs_market_data,
+            "needs_transaction": needs_transaction,
+            "needs_tour": needs_tour,
+            "buyer_agreement_signed": bool(context.get("buyer_agreement_signed")),
+            "is_delegating_to_brain": any(d.to_role == AgentRole.BRAIN for d in delegations),
+            "is_delegating_to_closer": any(d.to_role == AgentRole.CLOSER for d in delegations),
+        }
+        response_content = self._compose_response(message, facts, fallback)
         confidence = min(0.9, qualification["score"] + 0.3)
 
         return AgentResponse(
@@ -120,6 +153,27 @@ class VoiceAgent(BaseAgent):
             needs_human=tier == "looky_loo" and qualification["score"] < 0.2,
             human_reason="Very low intent - may benefit from human nurturing" if tier == "looky_loo" and qualification["score"] < 0.2 else None,
         )
+
+    def _compose_response(self, user_message: str, facts: dict, fallback: str) -> str:
+        if not self.llm.available:
+            return fallback
+        # When delegating, Voice's placeholder gets replaced anyway — keep it terse.
+        if facts["is_delegating_to_brain"] or facts["is_delegating_to_closer"]:
+            return fallback
+        try:
+            result = self.llm.call(
+                system=_VOICE_COMPOSE_SYSTEM,
+                user=(
+                    f"CUSTOMER_MESSAGE: {user_message}\n\n"
+                    f"FACTS:\n{json.dumps(facts, indent=2)}\n\n"
+                    "Write your reply now."
+                ),
+            )
+            text = result.text.strip()
+            return text if text else fallback
+        except Exception as e:
+            log.warning("voice llm compose failed, falling back: %s", e)
+            return fallback
 
     def _detect_intent(self, message: str) -> dict:
         lower = message.lower()

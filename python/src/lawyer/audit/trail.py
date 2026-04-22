@@ -3,7 +3,7 @@ Append-only Audit Trail for all agent actions.
 Supports disparate impact analysis and regulatory review.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 import uuid

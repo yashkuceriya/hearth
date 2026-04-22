@@ -4,8 +4,7 @@ Aligns with Hearth's Repair Co-Pilot: crawls imagery to highlight repair details
 Produces ConditionCertaintyScores that feed into valuation and product-path routing.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 import logging
 
 logger = logging.getLogger(__name__)

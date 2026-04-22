@@ -10,8 +10,25 @@ from brain.valuation.engine import (
 )
 from brain.ingestion.data_rights import DataRightsManager, DataSource
 from brain.visual.analyzer import VisualPropertyAnalyzer, PhotoAnalysis
-from typing import Any
+from hearth_llm import LLMClient, get_default_client
+from typing import Any, Optional
 from datetime import datetime, timezone, timedelta
+import logging
+
+log = logging.getLogger(__name__)
+
+_BRAIN_COMPOSE_SYSTEM = """You are the Brain agent in Hearth, an AI real estate system.
+Your job is to write a short, natural response to the customer given a set of FACTS
+produced by a deterministic valuation engine.
+
+HARD RULES — do not violate:
+1. Use ONLY the numbers in FACTS. Never invent or round prices, sqft, or counts.
+2. Never use subjective terms about neighborhoods (good/bad/safe/dangerous/desirable).
+3. Never reference protected classes (race, religion, family status, etc).
+4. If FACTS is empty, ask the customer for an address — do not speculate.
+5. Keep it under 120 words. Plain prose, no marketing fluff.
+6. Always surface the confidence range when a valuation is present.
+"""
 
 
 class BrainAgent(BaseAgent):
@@ -23,10 +40,11 @@ class BrainAgent(BaseAgent):
     - Data rights verification before any data access
     """
 
-    def __init__(self, agent_id=None):
+    def __init__(self, agent_id=None, llm: Optional[LLMClient] = None):
         self.data_rights = DataRightsManager()
         self.valuation_engine = ValuationEngine(self.data_rights)
         self.visual_analyzer = VisualPropertyAnalyzer()
+        self.llm = llm if llm is not None else get_default_client()
         super().__init__(AgentRole.BRAIN, agent_id)
 
     def _setup_tools(self):
@@ -196,8 +214,11 @@ class BrainAgent(BaseAgent):
                     "or market data for Austin properties. Share an address to get started."
                 )
 
+        facts = self._collect_facts(locals())
+        content = self._compose_response(user_message, facts, response_parts)
+
         return AgentResponse(
-            content="\n".join(response_parts),
+            content=content,
             reasoning="\n".join(reasoning_steps),
             confidence=confidence,
             tool_calls_made=tool_calls,
@@ -205,6 +226,55 @@ class BrainAgent(BaseAgent):
             needs_human=confidence < 0.3,
             human_reason="Low valuation confidence" if confidence < 0.3 else None,
         )
+
+    def _collect_facts(self, local_vars: dict[str, Any]) -> dict[str, Any]:
+        """Pull deterministic facts out of think()'s locals for the composer."""
+        facts: dict[str, Any] = {}
+        if "address" in local_vars and local_vars["address"]:
+            facts["address"] = local_vars["address"]
+        if "valuation" in local_vars and local_vars.get("valuation") is not None:
+            v = local_vars["valuation"]
+            facts["valuation"] = {
+                "estimated_value_dollars": v.estimated_value.dollars,
+                "range_low_dollars": v.confidence_low.dollars,
+                "range_high_dollars": v.confidence_high.dollars,
+                "confidence": round(v.confidence_score, 2),
+            }
+        if "comps" in local_vars and local_vars.get("comps"):
+            facts["comparables"] = [
+                {
+                    "address": c.address,
+                    "sold_price_dollars": c.sold_price.dollars,
+                    "sqft": c.sqft,
+                }
+                for c in local_vars["comps"][:3]
+            ]
+        return facts
+
+    def _compose_response(
+        self,
+        user_message: str,
+        facts: dict[str, Any],
+        fallback_parts: list[str],
+    ) -> str:
+        """Let the LLM write prose when available; fall back to template strings."""
+        if not self.llm.available:
+            return "\n".join(fallback_parts)
+        try:
+            import json
+            result = self.llm.call(
+                system=_BRAIN_COMPOSE_SYSTEM,
+                user=(
+                    f"CUSTOMER_MESSAGE: {user_message}\n\n"
+                    f"FACTS (authoritative; use only these numbers):\n{json.dumps(facts, indent=2)}\n\n"
+                    "Write the response now."
+                ),
+            )
+            text = result.text.strip()
+            return text if text else "\n".join(fallback_parts)
+        except Exception as e:
+            log.warning("llm compose failed, falling back: %s", e)
+            return "\n".join(fallback_parts)
 
     def _check_data_rights(self, source: str, market: str, use_case: str) -> dict:
         ds = DataSource[source] if source in DataSource.__members__ else DataSource.TCAD

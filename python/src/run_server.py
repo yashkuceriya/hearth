@@ -3,7 +3,6 @@ Production entry point. Run with: python src/run_server.py
 Or from Docker: PYTHONPATH=/app/src python -c "from run_server import main; main()"
 """
 
-import os
 import sys
 import signal
 import logging

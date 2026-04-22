@@ -3,8 +3,25 @@ Closer Agent - Manages transactions, negotiation, and contract operations.
 """
 
 from agents.base import BaseAgent, AgentRole, AgentResponse, DelegationRequest, Tool
-from typing import Any
+from hearth_llm import LLMClient, get_default_client
+from typing import Any, Optional
+import json
+import logging
 import uuid as _uuid
+
+log = logging.getLogger(__name__)
+
+_CLOSER_COMPOSE_SYSTEM = """You are the Closer agent in Hearth, an AI real estate system.
+You handle offers, counter-offers, and contract preparation.
+
+HARD RULES — do not violate:
+1. Use ONLY the numbers in FACTS. Never invent prices, margins, or form details.
+2. NEVER draft legal language. Do not use words like "hereby", "indemnify", "waive",
+   "covenant", "represent and warrant". TREC forms are POPULATED, not drafted.
+3. If guardrails were violated, say so plainly and offer to adjust within bounds.
+4. Always state the TREC form number and name when mentioning contract preparation.
+5. Under 120 words. Plain, business-like prose.
+"""
 
 
 class CloserAgent(BaseAgent):
@@ -20,9 +37,10 @@ class CloserAgent(BaseAgent):
     GUARDRAIL_CEILING_MARGIN = 0.15
     MAX_CONCESSION_PCT = 0.06
 
-    def __init__(self, agent_id=None):
+    def __init__(self, agent_id=None, llm: Optional[LLMClient] = None):
         self.transactions: dict[str, dict] = {}
         self.negotiation_rounds: dict[str, list] = {}
+        self.llm = llm if llm is not None else get_default_client()
         super().__init__(AgentRole.CLOSER, agent_id)
 
     def _setup_tools(self):
@@ -149,6 +167,26 @@ class CloserAgent(BaseAgent):
                 "or checking transaction status. What would you like to do?"
             )
 
+        # LLM composes natural prose; facts below are authoritative (no invention allowed)
+        facts: dict[str, Any] = {
+            "intent": (
+                "make_offer" if wants_offer else
+                "counter_offer" if wants_counter else
+                "prepare_contract" if wants_contract else
+                "general"
+            ),
+        }
+        if wants_offer and valuation_cents:
+            facts["valuation_dollars"] = valuation_cents / 100
+            facts["proposed_offer_dollars"] = context.get(
+                "proposed_price_cents", int(valuation_cents * 0.99)
+            ) / 100
+        if tool_calls:
+            facts["tool_results"] = tool_calls
+        if claims:
+            facts["claims"] = [c["statement"] for c in claims]
+        content = self._compose_response(message, facts, content)
+
         return AgentResponse(
             content=content,
             reasoning="\n".join(reasoning_steps),
@@ -157,6 +195,25 @@ class CloserAgent(BaseAgent):
             delegations_made=delegations,
             claims=claims,
         )
+
+    def _compose_response(self, user_message: str, facts: dict, fallback: str) -> str:
+        if not self.llm.available:
+            return fallback
+        try:
+            result = self.llm.call(
+                system=_CLOSER_COMPOSE_SYSTEM,
+                user=(
+                    f"CUSTOMER_MESSAGE: {user_message}\n\n"
+                    f"FACTS (authoritative; use only these numbers):\n{json.dumps(facts, default=str, indent=2)}\n\n"
+                    f"FALLBACK_RESPONSE (use as reference if helpful):\n{fallback}\n\n"
+                    "Write the response now."
+                ),
+            )
+            text = result.text.strip()
+            return text if text else fallback
+        except Exception as e:
+            log.warning("closer llm compose failed, falling back: %s", e)
+            return fallback
 
     def _create_offer(self, property_id: str, price_cents: int, valuation_cents: int) -> dict:
         tx_id = f"txn-{_uuid.uuid4().hex[:8]}"
