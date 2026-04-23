@@ -20,5 +20,8 @@ module Closer
     def database_url
       "postgres://#{@db_user}:#{@db_password}@#{@db_host}:#{@db_port}/#{@db_name}"
     end
+
+    # Alias used by Migrator for readability.
+    alias_method :db_url, :database_url
   end
 end

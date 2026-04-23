@@ -9,8 +9,10 @@ import (
 	"syscall"
 
 	_ "github.com/lib/pq"
+	"github.com/yashkuceriya/hearth/migrations"
 	"github.com/yashkuceriya/hearth/internal/channel"
 	"github.com/yashkuceriya/hearth/internal/compliance"
+	"github.com/yashkuceriya/hearth/internal/migrate"
 	"github.com/yashkuceriya/hearth/internal/orchestrator"
 	"github.com/yashkuceriya/hearth/internal/routing"
 	"github.com/yashkuceriya/hearth/internal/session"
@@ -41,6 +43,15 @@ func main() {
 
 	if err := db.Ping(); err != nil {
 		logger.Fatal("failed to ping database", zap.Error(err))
+	}
+
+	// Apply schema migrations before anything else touches the DB.
+	ms, err := migrate.LoadFromFS(migrations.FS, ".")
+	if err != nil {
+		logger.Fatal("load migrations", zap.Error(err))
+	}
+	if err := migrate.Apply(db, ms, logger); err != nil {
+		logger.Fatal("apply migrations", zap.Error(err))
 	}
 
 	// Initialize components
