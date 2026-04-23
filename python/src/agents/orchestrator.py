@@ -66,7 +66,16 @@ class MultiAgentOrchestrator:
         self.session_memory: dict[str, Any] = {}
 
     def _update_session_memory(self, user_message: str, turn: ConversationTurn):
-        """Extract and remember key context from each turn."""
+        """Extract and remember key context from each turn.
+
+        Keys carried forward across turns:
+          - address / property_id — so pronouns ("that", "it") resolve.
+          - product_path — so Voice doesn't re-ask program interest.
+          - last_valuation_cents / display — Closer uses as floor reference.
+          - transaction_id — so follow-ups reach the same deal.
+          - buyer_agreement_signed / discussed — tour gate short-circuits.
+          - last_intent — enables one-word follow-ups to route correctly.
+        """
         lower = user_message.lower()
 
         # Remember address if mentioned
@@ -78,6 +87,14 @@ class MultiAgentOrchestrator:
         if addr_match:
             self.session_memory["address"] = addr_match.group(0).strip()
             self.session_memory["property_id"] = addr_match.group(0).strip()
+
+        # Remember last intent so "tell me more" / "yes, go ahead" routes to the same agent
+        if any(k in lower for k in ["value", "price", "worth", "valuation", "comp", "market"]):
+            self.session_memory["last_intent"] = "valuation"
+        elif any(k in lower for k in ["offer", "buy", "purchase", "contract", "negotiate"]):
+            self.session_memory["last_intent"] = "transaction"
+        elif any(k in lower for k in ["tour", "visit", "showing", "walkthrough"]):
+            self.session_memory["last_intent"] = "tour"
 
         # Remember product path interest
         if any(kw in lower for kw in ["cash offer", "direct offer", "sell my home"]):

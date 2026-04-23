@@ -97,8 +97,13 @@ class BrainAgent(BaseAgent):
         property_id = context.get("property_id", "")
         user_message = context.get("message", message)
 
-        # Try to extract address from user message if no property_id
-        address = self._extract_address(user_message) or self._extract_address(message)
+        # Prefer an address in the current message; fall back to session memory
+        # so multi-turn references ("what about that one", "tell me more") work.
+        address = (
+            self._extract_address(user_message)
+            or self._extract_address(message)
+            or context.get("address", "")
+        )
         if not property_id and address:
             property_id = address
 

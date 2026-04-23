@@ -3,8 +3,39 @@ Centralized configuration loaded from environment variables.
 All config has sensible defaults for development.
 """
 
+import logging
 import os
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
+
+
+def redact(value: str, keep: int = 4) -> str:
+    """Redact a secret for log output while keeping enough prefix to identify it."""
+    if not value:
+        return "<unset>"
+    return value[:keep] + "***" if len(value) > keep else "***"
+
+
+def log_redacted_secrets() -> None:
+    """Emit a single line summarizing which secrets are set. Never logs values.
+
+    Ops uses this to confirm configuration without exposing credentials.
+    """
+    secrets = [
+        "POSTGRES_PASSWORD",
+        "ANTHROPIC_API_KEY",
+        "TWILIO_AUTH_TOKEN",
+        "SENDGRID_API_KEY",
+        "MLS_RESO_API_KEY",
+        "REDIS_URL",
+    ]
+    parts = []
+    for name in secrets:
+        v = os.environ.get(name, "")
+        status = "set" if v else "missing"
+        parts.append(f"{name}={status}")
+    log.info("secrets loaded: %s", " ".join(parts))
 
 
 @dataclass(frozen=True)

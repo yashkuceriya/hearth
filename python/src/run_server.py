@@ -10,7 +10,7 @@ import json
 from concurrent import futures
 from datetime import datetime, timezone
 
-from config import ServiceConfig
+from config import ServiceConfig, log_redacted_secrets
 from health import start_health_server
 
 
@@ -49,6 +49,7 @@ def main():
     logger.info(f"  gRPC port: {config.grpc_port}")
     logger.info(f"  HTTP port: {config.http_port}")
     logger.info(f"  Database: {config.db.host}:{config.db.port}/{config.db.name}")
+    log_redacted_secrets()
 
     # Start HTTP health server
     start_health_server(config.http_port, config.name)
